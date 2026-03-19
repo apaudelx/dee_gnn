@@ -45,26 +45,26 @@ def find_itp(compound_dir: Path) -> Optional[Path]:
 
 
 def build_bead_counts(data_root: Path) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    subdirs = [data_root / "2D_molecules", data_root / "Working_5_to_10_pesticides"]
-    for subdir in subdirs:
-        if not subdir.is_dir():
-            continue
-        for compound_dir in subdir.iterdir():
+        counts: dict[str, int] = {}
+        # Scan all immediate subdirectories of data_root
+        if not data_root.is_dir():
+            return counts
+        for compound_dir in data_root.iterdir():
             if not compound_dir.is_dir():
                 continue
             itp_path = find_itp(compound_dir)
             if itp_path is None:
                 continue
             counts[compound_dir.name] = count_beads_in_itp(itp_path)
-    return counts
+        return counts
 
 
 def main() -> None:
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", required=True, help="CSV with compound and encapsulation_mean")
     ap.add_argument("--data", default="filtered_training_data", help="Data root with .itp files")
-    ap.add_argument("--out", default="bead_count_vs_encapsulation.png", help="Output image")
+    ap.add_argument("--out", default=None, help="Output image")
     ap.add_argument("--id-col", default="compound", help="Compound id column")
     ap.add_argument("--y-col", default="encapsulation_mean", help="Target column")
     args = ap.parse_args()
@@ -101,8 +101,15 @@ def main() -> None:
     plt.title("Bead Count vs Encapsulation")
 
     plt.tight_layout()
-    plt.savefig(args.out, dpi=200)
-    print(f"Wrote plot to {args.out}")
+
+    # Default output path: bead_count_vs_encapsulation_<data_folder>.png in the root directory
+    if args.out:
+        out_path = args.out
+    else:
+        folder_name = Path(args.data).name
+        out_path = f"bead_count_vs_encapsulation_{folder_name}.png"
+    plt.savefig(out_path, dpi=200)
+    print(f"Wrote plot to {out_path}")
 
 
 if __name__ == "__main__":

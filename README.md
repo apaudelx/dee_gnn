@@ -92,7 +92,7 @@ You can still override any file (model, config, bead type map) by passing `--mod
 
 ---
 
-## Bead Type Mapping Consistency (IMPORTANT)
+## Bead Type Mapping Consistency
 
 The bead type ID mapping used during training is saved as `bead_type_to_id.json` in the results subfolder. Using `--use-model` ensures this mapping is used for inference, guaranteeing bead type IDs match between training and prediction, and preventing embedding mismatches.
 
@@ -115,8 +115,8 @@ python utils/plot_bead_count_vs_encapsulation.py --csv <your_csv> --data <your_d
 Example:
 
 ```bash
-python utils/plot_bead_count_vs_encapsulation.py --csv data/ee_values_667.csv --data data
+python utils/plot_bead_count_vs_encapsulation.py --csv data/ee_values_667.csv --data data/ee_itp_667/
 ```
 
-The output image (bead_count_vs_encapsulation.png) will be saved in your project root. You can change the output filename with --out.
+By default, the output image (bead_count_vs_encapsulation.png) will be saved in the root dir. You can change the output filename and location with --out.
 
