@@ -1,0 +1,13 @@
+# macOS specific
+.DS_Store
+
+# Python bytescode
+__pycache__/
+
+# Data and Results (large files)
+# /data/filtered_training_data
+
+# Environment
+.env
+venv/
+.venv/

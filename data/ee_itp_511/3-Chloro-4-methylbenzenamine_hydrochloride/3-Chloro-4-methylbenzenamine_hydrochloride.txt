@@ -1,0 +1,18 @@
+Compound: 3-Chloro-4-methylbenzenamine_hydrochloride
+SMILES:   CC1=C(Cl)C=C(N)C=C1
+
+All beads
+--------------------------------------------------------------------------------
+index    bead_type  atoms_idx            atoms_elem           #conns       mass     x        y        z       
+0        TC6        0,1                  C,C                  2            36.0     0.1953   -0.0062  0.0073  
+1        SX3        2,3,4                C,Cl,C               2            54.0     0.0300   0.1612   0.0542  
+2        TN6d       5,6                  C,N                  2            36.0     -0.2325  -0.0003  -0.0112 
+3        TC5        7,8                  C,C                  2            36.0     -0.0206  -0.1179  -0.0395 
+
+Bead connections
+--------------------------------------------------------------------------------
+index    to_idx   bond    
+0        1        1.5     
+0        3        1.5     
+1        2        1.5     
+2        3        1.5     

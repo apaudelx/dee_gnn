@@ -1,0 +1,16 @@
+{
+  "config": {
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "max_epochs": 1000,
+    "early_stopping_patience": 100,
+    "hidden_dim": 128,
+    "num_layers": 3,
+    "dropout": 0.2,
+    "node_dim": 5,
+    "num_bead_types": 167,
+    "embedding_dim": 32,
+    "edge_dim": 3
+  }
+}

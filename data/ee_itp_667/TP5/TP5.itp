@@ -1,0 +1,12 @@
+; TP5 single-bead topology
+; Generated from creating_itp.txt
+
+[ moleculetype ]
+; name    nrexcl
+res  1
+
+[ atoms ]
+; nr  type  resnr  residue  atom  cgnr  charge    mass
+  1   TP5      1     res   TP5      1      0.000    36.000
+
+;[bonds]

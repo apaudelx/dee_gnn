@@ -1,0 +1,12 @@
+; SN5a single-bead topology
+; Generated from creating_itp.txt
+
+[ moleculetype ]
+; name    nrexcl
+res  1
+
+[ atoms ]
+; nr  type  resnr  residue  atom  cgnr  charge    mass
+  1   SN5a     1     res   SN5a     1      0.000    54.000
+
+;[bonds]
