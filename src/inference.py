@@ -4,6 +4,8 @@ import argparse
 import json
 import pandas as pd
 import torch
+import joblib
+import numpy as np
 from torch_geometric.loader import DataLoader
 
 from parse_itp import parse_nbfix_table
@@ -116,6 +118,34 @@ def main():
 
     nbfix_map = parse_nbfix_table(args.nbfix)
 
+    # ── Load scalers saved during training ──────────────────────────────────
+    node_scaler  = None
+    edge_scaler  = None
+    graph_scaler = None
+
+    if args.use_model:
+        node_scaler_path  = os.path.join(subdir, "node_scaler.pkl")
+        edge_scaler_path  = os.path.join(subdir, "edge_scaler.pkl")
+        graph_scaler_path = os.path.join(subdir, "graph_scaler.pkl")
+
+        if os.path.exists(node_scaler_path):
+            node_scaler = joblib.load(node_scaler_path)
+            print(f"Loaded node scaler from {node_scaler_path}")
+        else:
+            print("Warning: node_scaler.pkl not found — node features will not be normalized.")
+
+        if os.path.exists(edge_scaler_path):
+            edge_scaler = joblib.load(edge_scaler_path)
+            print(f"Loaded edge scaler from {edge_scaler_path}")
+        else:
+            print("Warning: edge_scaler.pkl not found — edge features will not be normalized.")
+
+        if os.path.exists(graph_scaler_path):
+            graph_scaler = joblib.load(graph_scaler_path)
+            print(f"Loaded graph scaler from {graph_scaler_path}")
+        else:
+            print("Warning: graph_scaler.pkl not found — graph-level features will not be normalized.")
+
     bead_type_to_id = None
     if bead_type_map_path:
         if os.path.exists(bead_type_map_path):
@@ -135,6 +165,41 @@ def main():
     if not graphs:
         print("Error: No graphs built")
         sys.exit(1)
+
+    # ── Apply scalers to inference graphs ───────────────────────────────────
+    if node_scaler is not None:
+        for g in graphs:
+            g.x = torch.tensor(
+                node_scaler.transform(g.x.numpy()), dtype=torch.float32)
+
+    if edge_scaler is not None:
+        for g in graphs:
+            if g.edge_attr.shape[0] > 0:
+                g.edge_attr = torch.tensor(
+                    edge_scaler.transform(g.edge_attr.numpy()), dtype=torch.float32)
+
+    if graph_scaler is not None:
+        graph_feats = np.array([[
+            g.num_atoms.item(),
+            g.num_bonds.item(),
+            g.avg_degree.item(),
+            g.max_degree.item(),
+            g.graph_density.item(),
+            g.total_charge.item(),
+            g.charge_std.item(),
+            g.unique_bead_types.item()
+        ] for g in graphs], dtype=np.float32)
+
+        normed = graph_scaler.transform(graph_feats)
+        for g, row in zip(graphs, normed):
+            g.num_atoms         = torch.tensor([row[0]], dtype=torch.float32)
+            g.num_bonds         = torch.tensor([row[1]], dtype=torch.float32)
+            g.avg_degree        = torch.tensor([row[2]], dtype=torch.float32)
+            g.max_degree        = torch.tensor([row[3]], dtype=torch.float32)
+            g.graph_density     = torch.tensor([row[4]], dtype=torch.float32)
+            g.total_charge      = torch.tensor([row[5]], dtype=torch.float32)
+            g.charge_std        = torch.tensor([row[6]], dtype=torch.float32)
+            g.unique_bead_types = torch.tensor([row[7]], dtype=torch.float32)
 
     compound_ids_pred, predictions = predict(model, graphs, device)
 

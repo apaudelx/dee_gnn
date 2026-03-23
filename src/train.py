@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import joblib
 from scipy.stats import spearmanr
 import json
 from datetime import datetime
@@ -221,7 +223,95 @@ def main():
     test_graphs = [graphs[i] for i in test_idx]
     
     print(f"\nTrain: {len(train_graphs)}, Val: {len(val_graphs)}, Test: {len(test_graphs)}")
-    
+
+    # ── Node feature normalization ──────────────────────────────────────────
+    train_node_feats = np.vstack([g.x.numpy() for g in train_graphs])
+
+    node_scaler = StandardScaler()
+    node_scaler.fit(train_node_feats)
+
+    # Fix zero-variance columns (e.g. charge is all zeros in current dataset)
+    # so we don't divide by zero, and future charged molecules pass through cleanly
+    zero_var_cols = np.where(node_scaler.scale_ == 0)[0]
+    if len(zero_var_cols) > 0:
+        print(f"  Warning: zero-variance node feature columns (indices): {zero_var_cols.tolist()}")
+        print("  These will be kept as-is (scale=1, mean=0) until future data has variance.")
+        node_scaler.scale_[zero_var_cols] = 1.0
+        node_scaler.mean_[zero_var_cols]  = 0.0
+
+    for g in train_graphs + val_graphs + test_graphs:
+        g.x = torch.tensor(
+            node_scaler.transform(g.x.numpy()), dtype=torch.float32)
+
+    print(f"  Node features normalized (fit on {len(train_graphs)} training graphs)")
+
+    # ── Edge feature normalization ───────────────────────────────────────────
+    # Only fit on graphs that actually have edges
+    train_edge_feats = np.vstack([
+        g.edge_attr.numpy() for g in train_graphs if g.edge_attr.shape[0] > 0
+    ])
+
+    edge_scaler = StandardScaler()
+    edge_scaler.fit(train_edge_feats)
+
+    # Fix zero-variance columns (k=20000 always, funct=1 always in current dataset)
+    zero_var_edge_cols = np.where(edge_scaler.scale_ == 0)[0]
+    if len(zero_var_edge_cols) > 0:
+        print(f"  Warning: zero-variance edge feature columns (indices): {zero_var_edge_cols.tolist()}")
+        edge_scaler.scale_[zero_var_edge_cols] = 1.0
+        edge_scaler.mean_[zero_var_edge_cols]  = 0.0
+
+    for g in train_graphs + val_graphs + test_graphs:
+        if g.edge_attr.shape[0] > 0:
+            g.edge_attr = torch.tensor(
+                edge_scaler.transform(g.edge_attr.numpy()), dtype=torch.float32)
+
+    print(f"  Edge features normalized (fit on edges from {len(train_graphs)} training graphs)")
+
+    # ── Graph-level feature normalization ────────────────────────────────────
+    def get_graph_level_feats(graphs):
+        return np.array([[
+            g.num_atoms.item(),
+            g.num_bonds.item(),
+            g.avg_degree.item(),
+            g.max_degree.item(),
+            g.graph_density.item(),
+            g.total_charge.item(),
+            g.charge_std.item(),
+            g.unique_bead_types.item()
+        ] for g in graphs], dtype=np.float32)
+
+    train_graph_feats = get_graph_level_feats(train_graphs)
+
+    graph_scaler = StandardScaler()
+    graph_scaler.fit(train_graph_feats)
+
+    # Fix zero-variance columns (total_charge, charge_std are all zeros currently)
+    zero_var_graph_cols = np.where(graph_scaler.scale_ == 0)[0]
+    if len(zero_var_graph_cols) > 0:
+        print(f"  Warning: zero-variance graph-level feature columns (indices): {zero_var_graph_cols.tolist()}")
+        graph_scaler.scale_[zero_var_graph_cols] = 1.0
+        graph_scaler.mean_[zero_var_graph_cols]  = 0.0
+
+    def apply_graph_scaler(graphs, scaler):
+        feats  = get_graph_level_feats(graphs)
+        normed = scaler.transform(feats)
+        for g, row in zip(graphs, normed):
+            g.num_atoms         = torch.tensor([row[0]], dtype=torch.float32)
+            g.num_bonds         = torch.tensor([row[1]], dtype=torch.float32)
+            g.avg_degree        = torch.tensor([row[2]], dtype=torch.float32)
+            g.max_degree        = torch.tensor([row[3]], dtype=torch.float32)
+            g.graph_density     = torch.tensor([row[4]], dtype=torch.float32)
+            g.total_charge      = torch.tensor([row[5]], dtype=torch.float32)
+            g.charge_std        = torch.tensor([row[6]], dtype=torch.float32)
+            g.unique_bead_types = torch.tensor([row[7]], dtype=torch.float32)
+
+    apply_graph_scaler(train_graphs, graph_scaler)
+    apply_graph_scaler(val_graphs,   graph_scaler)
+    apply_graph_scaler(test_graphs,  graph_scaler)
+
+    print(f"  Graph-level features normalized (fit on {len(train_graphs)} training graphs)")
+
     train_loader = DataLoader(train_graphs, batch_size=config['batch_size'], shuffle=True)
     val_loader = DataLoader(val_graphs, batch_size=config['batch_size'], shuffle=False)
     test_loader = DataLoader(test_graphs, batch_size=config['batch_size'], shuffle=False)
@@ -311,6 +401,14 @@ def main():
 
     # Save model
     torch.save(model.state_dict(), os.path.join(run_subdir, "model.pth"))
+
+    # Save scalers for inference
+    joblib.dump(node_scaler,  os.path.join(run_subdir, "node_scaler.pkl"))
+    joblib.dump(edge_scaler,  os.path.join(run_subdir, "edge_scaler.pkl"))
+    joblib.dump(graph_scaler, os.path.join(run_subdir, "graph_scaler.pkl"))
+    print(f"  - Node scaler:  {os.path.join(run_subdir, 'node_scaler.pkl')}")
+    print(f"  - Edge scaler:  {os.path.join(run_subdir, 'edge_scaler.pkl')}")
+    print(f"  - Graph scaler: {os.path.join(run_subdir, 'graph_scaler.pkl')}")
 
     print(f"\nAll results saved in: {run_subdir}")
     print(f"  - Metrics: {os.path.join(run_subdir, 'results.json')}")

@@ -142,14 +142,14 @@ class EncapsulationGNN(nn.Module):
                 return t.squeeze() if t.dim() > 1 else t
             
             graph_feats = torch.stack([
-                squeeze_if_needed(num_atoms) / 100.0,
-                squeeze_if_needed(num_bonds) / 100.0,
-                squeeze_if_needed(avg_degree) / 10.0,
-                squeeze_if_needed(max_degree) / 10.0 if max_degree is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
-                squeeze_if_needed(graph_density) if graph_density is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
-                squeeze_if_needed(total_charge) / 10.0 if total_charge is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
-                squeeze_if_needed(charge_std) / 5.0 if charge_std is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
-                squeeze_if_needed(unique_bead_types) / 50.0 if unique_bead_types is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(num_atoms)         if num_atoms         is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(num_bonds)         if num_bonds         is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(avg_degree)        if avg_degree        is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(max_degree)        if max_degree        is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(graph_density)     if graph_density     is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(total_charge)      if total_charge      is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(charge_std)        if charge_std        is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
+                squeeze_if_needed(unique_bead_types) if unique_bead_types is not None else torch.zeros(graph_embedding.size(0), device=graph_embedding.device),
             ], dim=-1)
             graph_feat_emb = self.graph_feat_proj(graph_feats)
             graph_embedding = torch.cat([graph_embedding, graph_feat_emb], dim=-1)
