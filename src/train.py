@@ -150,9 +150,11 @@ def train_model(model, train_loader, val_loader, device, config):
     best_val_mae = float('inf')
     best_model_state = None
     patience_counter = 0
+    train_losses = []
     
     for epoch in range(config['max_epochs']):
         train_loss = train_epoch(model, train_loader, optimizer, criterion, device)
+        train_losses.append(train_loss)
 
         if train_only:
             scheduler.step(train_loss)
@@ -181,12 +183,13 @@ def train_model(model, train_loader, val_loader, device, config):
                   f"Val R²={val_metrics['r2']:.4f}, Val Spearman={val_metrics['spearman']:.4f}")
     
     if train_only:
-        return None, None, None
+        return None, None, None, train_losses
 
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
     
-    return validate(model, val_loader, device)
+    metrics, preds, targets = validate(model, val_loader, device)
+    return metrics, preds, targets, train_losses
 
 
 def _fit_scaler(features, label):
@@ -268,6 +271,20 @@ def _plot_pred_vs_true(targets, preds, metrics, title, color, save_path):
     plt.title(title)
     rmse = np.sqrt(metrics['mse'])
     plt.legend([f"RMSE: {rmse:.4f}\nMAE: {metrics['mae']:.4f}"], loc="upper left")
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=200)
+    plt.close()
+
+
+def _plot_training_loss(train_losses, save_path):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8, 5))
+    epochs = range(1, len(train_losses) + 1)
+    plt.plot(epochs, train_losses, color="#2ca02c", linewidth=1.5)
+    plt.xlabel("Epoch")
+    plt.ylabel("Training Loss")
+    plt.title("Training Loss Curve")
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=200)
     plt.close()
@@ -395,8 +412,13 @@ def main():
         embedding_dim=config['embedding_dim']
     ).to(device)
 
-    val_metrics, val_preds, val_targets = train_model(
+    val_metrics, val_preds, val_targets, train_losses = train_model(
         model, train_loader, val_loader, device, config)
+
+    # ── Evaluate on training data in train-only mode ─────────────────────────
+    train_metrics, train_preds, train_targets = (None, None, None)
+    if train_only:
+        train_metrics, train_preds, train_targets = validate(model, train_loader, device)
 
     # ── Evaluate test set if present ─────────────────────────────────────────
     test_metrics, test_preds, test_targets = (None, None, None)
@@ -405,6 +427,10 @@ def main():
 
     # ── Print results ────────────────────────────────────────────────────────
     print("RESULTS")
+    if train_only:
+        print("\nTraining Set (train-only mode):")
+        print(f"  MAE: {train_metrics['mae']:.4f}, RMSE: {np.sqrt(train_metrics['mse']):.4f}")
+        print(f"  R²: {train_metrics['r2']:.4f}, Spearman: {train_metrics['spearman']:.4f}")
     if val_metrics:
         print("\nValidation Set:")
         print(f"  MAE: {val_metrics['mae']:.4f}, RMSE: {np.sqrt(val_metrics['mse']):.4f}")
@@ -413,8 +439,6 @@ def main():
         print("\nTest Set:")
         print(f"  MAE: {test_metrics['mae']:.4f}, RMSE: {np.sqrt(test_metrics['mse']):.4f}")
         print(f"  R²: {test_metrics['r2']:.4f}, Spearman: {test_metrics['spearman']:.4f}")
-    if train_only:
-        print("\n  (Train-only mode — no validation/test metrics)")
 
     # ── Save artifacts ───────────────────────────────────────────────────────
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -429,12 +453,25 @@ def main():
         json.dump({'config': config}, f, indent=2)
 
     results_payload = {'config': config}
+    if train_metrics:
+        results_payload['train_metrics'] = train_metrics
     if val_metrics:
         results_payload['val_metrics'] = val_metrics
     if test_metrics:
         results_payload['test_metrics'] = test_metrics
     with open(os.path.join(run_subdir, "results.json"), 'w') as f:
         json.dump(results_payload, f, indent=2)
+
+    if train_preds is not None:
+        pd.DataFrame({'target': train_targets, 'predicted': train_preds}).to_csv(
+            os.path.join(run_subdir, "train_predictions.csv"), index=False)
+        train_plot_path = os.path.join(run_subdir, "train_pred_vs_true.png")
+        _plot_pred_vs_true(train_targets, train_preds, train_metrics,
+                           "Training: Predicted vs True", "#2ca02c", train_plot_path)
+
+    if train_losses:
+        loss_plot_path = os.path.join(run_subdir, "training_loss.png")
+        _plot_training_loss(train_losses, loss_plot_path)
 
     if val_preds is not None:
         pd.DataFrame({'target': val_targets, 'predicted': val_preds}).to_csv(
@@ -464,6 +501,11 @@ def main():
     print(f"  - Node scaler:  {os.path.join(run_subdir, 'node_scaler.pkl')}")
     print(f"  - Edge scaler:  {os.path.join(run_subdir, 'edge_scaler.pkl')}")
     print(f"  - Graph scaler: {os.path.join(run_subdir, 'graph_scaler.pkl')}")
+    if train_losses:
+        print(f"  - Training loss curve: {loss_plot_path}")
+    if train_preds is not None:
+        print(f"  - Training predictions: {os.path.join(run_subdir, 'train_predictions.csv')}")
+        print(f"  - Training plot: {train_plot_path}")
     if val_preds is not None:
         print(f"  - Validation predictions: {os.path.join(run_subdir, 'val_predictions.csv')}")
         print(f"  - Validation plot: {val_plot_path}")
