@@ -28,10 +28,13 @@ pip install -r requirements.txt
 
 ## Training
 
-Run from the project root. **All training input flags are required:**
+Run from the project root. Three data-splitting modes are supported.
+
+### Mode 1: Auto-Split (original)
+
+Pass a single CSV — the script splits it 90/5/5 into train/val/test:
 
 ```bash
-# Train model (all flags required)
 python main.py train \
 	--config config/config.json \
 	--training-csv data/ee_values_667.csv \
@@ -39,14 +42,49 @@ python main.py train \
 	--data-dir data/ee_itp_667
 ```
 
-You must specify all of:
-- `--config` (path to config JSON)
-- `--training-csv` (CSV with training data)
-- `--nbfix` (NBFIX table file)
-- `--data-dir` (directory with compound folders)
+### Mode 2: Custom Split
 
-If any are missing, the script will show an error and usage instructions.
+Provide separate CSVs for training, validation, and/or test sets:
 
+```bash
+python main.py train \
+	--train-data data/train.csv \
+	--val-data data/val.csv \
+	--test-data data/test.csv \
+	--nbfix data/NBFIX_table \
+	--data-dir data/ee_itp_667
+```
+
+You may omit `--test-data` (no test evaluation) or `--val-data` (see train-only below).
+
+### Mode 3: Train-Only (no splitting)
+
+Use 100% of the data for training. Because there is no validation set for early stopping, `--epochs` is required:
+
+```bash
+python main.py train \
+	--train-data data/ee_values_667.csv \
+	--epochs 500 \
+	--nbfix data/NBFIX_table \
+	--data-dir data/ee_itp_667
+```
+
+### Common Flags
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--config` | Yes (auto-supplied by `main.py`) | Path to config JSON |
+| `--nbfix` | Yes (auto-supplied by `main.py`) | NBFIX table file |
+| `--data-dir` | Yes | Directory with compound folders |
+| `--training-csv` | Mode 1 only | Single CSV — auto-split 90/5/5 |
+| `--train-data` | Modes 2 & 3 | CSV for training set |
+| `--val-data` | Optional (Mode 2) | CSV for validation set |
+| `--test-data` | Optional (Mode 2) | CSV for test set |
+| `--epochs` | Required for Mode 3 | Fixed epoch count (overrides config `max_epochs`) |
+| `--results-dir` | No (default: `results`) | Output directory |
+| `--seed` | No (default: 121) | Random seed |
+
+> `--training-csv` and `--train-data` are mutually exclusive.
 
 After training, all outputs (model, config, bead type mapping, metrics, predictions) are saved in a unique subfolder, e.g.:
 
@@ -56,18 +94,20 @@ results/20260319_143402/
 	config.json
 	bead_type_to_id.json
 	results.json
-	val_predictions.csv
-	test_predictions.csv
-	val_pred_vs_true.png
-	test_pred_vs_true.png
+	val_predictions.csv   # only when val data is present
+	test_predictions.csv  # only when test data is present
+	val_pred_vs_true.png  # only when val data is present
+	test_pred_vs_true.png # only when test data is present
 ```
 
 ## Train/Validation/Test Split Logic
 
-During training, the dataset is split as follows:
+When using `--training-csv` (auto-split mode), the dataset is split as follows:
 - **90%** of compounds are used for training.
 - The remaining **10%** are split equally into validation and test sets (**5%** each).
 - Splitting is random but reproducible (controlled by the seed).
+
+When using `--train-data`, you control the splits entirely via the CSVs you provide.
 
 ## Inference / Prediction
 
