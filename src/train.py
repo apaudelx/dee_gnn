@@ -295,6 +295,8 @@ def main():
     parser.add_argument("--config", required=True, help="Path to config JSON")
     parser.add_argument("--nbfix", required=True, help="Path to NBFIX table")
     parser.add_argument("--data-dir", required=True, help="Directory containing compound folders")
+    parser.add_argument("--extra-data-dirs", nargs="*", default=[],
+                        help="Additional data directories (bead types from all dirs are included in vocabulary)")
     parser.add_argument("--results-dir", default="results", help="Directory to save outputs")
     parser.add_argument("--seed", type=int, default=121, help="Random seed")
 
@@ -336,7 +338,8 @@ def main():
     nbfix_map = parse_nbfix_table(args.nbfix)
     print(f"Loaded {len(nbfix_map)} bead type parameters")
 
-    builder = MolecularGraphBuilder(nbfix_map, data_dir=args.data_dir)
+    builder = MolecularGraphBuilder(nbfix_map, data_dir=args.data_dir,
+                                     extra_data_dirs=args.extra_data_dirs)
 
     # ── Build graph sets depending on split mode ─────────────────────────────
     if args.training_csv:
