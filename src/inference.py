@@ -72,7 +72,12 @@ def main():
     parser.add_argument("--config", default=None, help="Config JSON path (overrides --use-model)")
     parser.add_argument("--nbfix", default="NBFIX_table", help="NBFIX table file path")
     parser.add_argument("--output", "-o", default=None, help="Output CSV (default: predictions.csv in results subdir if set)")
-    parser.add_argument("--bead-type-map", default=None, help="Path to bead_type_to_id JSON file from training (overrides --use-model)")
+    parser.add_argument("--bead-type-map", default=None, help="Path to bead_type_to_id JSON file from training (overrides default next to config)")
+    parser.add_argument(
+        "--allow-auto-bead-mapping",
+        action="store_true",
+        help="Unsafe: if set, allow missing bead_type_to_id.json and rebuild indices from data_dir (breaks embedding alignment with training)",
+    )
 
     args = parser.parse_args()
 
@@ -94,6 +99,8 @@ def main():
         config_path = args.config
         bead_type_map_path = args.bead_type_map
         output_path = args.output if args.output else "predictions.csv"
+        if bead_type_map_path is None:
+            bead_type_map_path = os.path.join(os.path.dirname(os.path.abspath(config_path)), "bead_type_to_id.json")
 
     if args.folder:
         compound_ids = find_compounds_in_folder(args.folder)
@@ -147,12 +154,29 @@ def main():
             print("Warning: graph_scaler.pkl not found — graph-level features will not be normalized.")
 
     bead_type_to_id = None
-    if bead_type_map_path:
-        if os.path.exists(bead_type_map_path):
-            with open(bead_type_map_path, 'r') as f:
-                bead_type_to_id = json.load(f)
-        else:
-            print(f"Warning: bead_type_to_id mapping file not found at {bead_type_map_path}. Proceeding without it.")
+    if bead_type_map_path and os.path.exists(bead_type_map_path):
+        with open(bead_type_map_path, 'r') as f:
+            bead_type_to_id = json.load(f)
+    elif bead_type_map_path and not args.allow_auto_bead_mapping:
+        print(
+            f"Error: bead_type_to_id.json from training is required for correct embedding indices.\n"
+            f"  Expected: {bead_type_map_path}\n"
+            f"  Copy it from the same results directory as model.pth, or pass --bead-type-map PATH.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    elif not args.allow_auto_bead_mapping and bead_type_map_path is None:
+        print(
+            "Error: could not resolve bead_type_to_id.json path (set --bead-type-map or use --use-model).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    else:
+        print(
+            "Warning: --allow-auto-bead-mapping: rebuilding bead indices from data_dir; "
+            "predictions may not match the trained model.",
+            file=sys.stderr,
+        )
 
     builder = MolecularGraphBuilder(nbfix_map, data_dir=data_dir, bead_type_to_id=bead_type_to_id)
 
