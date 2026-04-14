@@ -116,9 +116,14 @@ def train_epoch(model, loader, optimizer, criterion, device):
 
 
 def validate(model, loader, device):
+    """Return (metrics, preds, targets, compound_ids).
+
+    compound_ids is aligned with preds/targets when each batch exposes
+    ``compound_id`` (list of str, same length as preds); otherwise None.
+    """
     model.eval()
-    all_preds, all_targets = [], []
-    
+    all_preds, all_targets, all_ids = [], [], []
+
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(device)
@@ -128,10 +133,17 @@ def validate(model, loader, device):
                        batch.total_charge, batch.charge_std, batch.unique_bead_types)
             all_preds.append(out.cpu().numpy())
             all_targets.append(batch.y.cpu().numpy())
-    
+            cid = getattr(batch, "compound_id", None)
+            if cid is not None:
+                if isinstance(cid, str):
+                    all_ids.append(cid)
+                else:
+                    all_ids.extend(list(cid))
+
     all_preds = np.concatenate(all_preds).flatten()
     all_targets = np.concatenate(all_targets).flatten()
-    return compute_metrics(all_targets, all_preds), all_preds, all_targets
+    compound_ids = all_ids if len(all_ids) == len(all_preds) else None
+    return compute_metrics(all_targets, all_preds), all_preds, all_targets, compound_ids
 
 
 def train_model(model, train_loader, val_loader, device, config):
@@ -162,7 +174,7 @@ def train_model(model, train_loader, val_loader, device, config):
                 print(f"  Epoch {epoch+1}/{config['max_epochs']}: Train Loss={train_loss:.4f}")
             continue
 
-        val_metrics, _, _ = validate(model, val_loader, device)
+        val_metrics, _, _, _ = validate(model, val_loader, device)
         scheduler.step(val_metrics['mae'])
         
         if val_metrics['mae'] < best_val_mae:
@@ -183,13 +195,13 @@ def train_model(model, train_loader, val_loader, device, config):
                   f"Val R²={val_metrics['r2']:.4f}, Val Spearman={val_metrics['spearman']:.4f}")
     
     if train_only:
-        return None, None, None, train_losses
+        return None, None, None, None, train_losses
 
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-    
-    metrics, preds, targets = validate(model, val_loader, device)
-    return metrics, preds, targets, train_losses
+
+    metrics, preds, targets, val_compounds = validate(model, val_loader, device)
+    return metrics, preds, targets, val_compounds, train_losses
 
 
 def _fit_scaler(features, label):
@@ -415,18 +427,22 @@ def main():
         embedding_dim=config['embedding_dim']
     ).to(device)
 
-    val_metrics, val_preds, val_targets, train_losses = train_model(
+    val_metrics, val_preds, val_targets, val_compounds, train_losses = train_model(
         model, train_loader, val_loader, device, config)
 
     # ── Evaluate on training data in train-only mode ─────────────────────────
-    train_metrics, train_preds, train_targets = (None, None, None)
+    train_metrics, train_preds, train_targets, train_compounds = (None, None, None, None)
     if train_only:
-        train_metrics, train_preds, train_targets = validate(model, train_loader, device)
+        # shuffle=False so rows match training CSV / graph build order; compound_id aligns
+        eval_loader = DataLoader(train_graphs, batch_size=config['batch_size'], shuffle=False)
+        train_metrics, train_preds, train_targets, train_compounds = validate(
+            model, eval_loader, device)
 
     # ── Evaluate test set if present ─────────────────────────────────────────
-    test_metrics, test_preds, test_targets = (None, None, None)
+    test_metrics, test_preds, test_targets, test_compounds = (None, None, None, None)
     if test_loader is not None:
-        test_metrics, test_preds, test_targets = validate(model, test_loader, device)
+        test_metrics, test_preds, test_targets, test_compounds = validate(
+            model, test_loader, device)
 
     # ── Print results ────────────────────────────────────────────────────────
     print("RESULTS")
@@ -466,7 +482,10 @@ def main():
         json.dump(results_payload, f, indent=2)
 
     if train_preds is not None:
-        pd.DataFrame({'target': train_targets, 'predicted': train_preds}).to_csv(
+        train_df = {'target': train_targets, 'predicted': train_preds}
+        if train_compounds is not None:
+            train_df['compound'] = train_compounds
+        pd.DataFrame(train_df).to_csv(
             os.path.join(run_subdir, "train_predictions.csv"), index=False)
         train_plot_path = os.path.join(run_subdir, "train_pred_vs_true.png")
         _plot_pred_vs_true(train_targets, train_preds, train_metrics,
@@ -477,14 +496,20 @@ def main():
         _plot_training_loss(train_losses, loss_plot_path)
 
     if val_preds is not None:
-        pd.DataFrame({'target': val_targets, 'predicted': val_preds}).to_csv(
+        val_df = {'target': val_targets, 'predicted': val_preds}
+        if val_compounds is not None:
+            val_df['compound'] = val_compounds
+        pd.DataFrame(val_df).to_csv(
             os.path.join(run_subdir, "val_predictions.csv"), index=False)
         val_plot_path = os.path.join(run_subdir, "val_pred_vs_true.png")
         _plot_pred_vs_true(val_targets, val_preds, val_metrics,
                            "Validation: Predicted vs True", "#1f77b4", val_plot_path)
 
     if test_preds is not None:
-        pd.DataFrame({'target': test_targets, 'predicted': test_preds}).to_csv(
+        test_df = {'target': test_targets, 'predicted': test_preds}
+        if test_compounds is not None:
+            test_df['compound'] = test_compounds
+        pd.DataFrame(test_df).to_csv(
             os.path.join(run_subdir, "test_predictions.csv"), index=False)
         test_plot_path = os.path.join(run_subdir, "test_pred_vs_true.png")
         _plot_pred_vs_true(test_targets, test_preds, test_metrics,
