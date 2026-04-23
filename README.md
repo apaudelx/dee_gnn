@@ -32,11 +32,7 @@ Run from the project root. Three data-splitting modes are supported.
 
 ### Mode 1: Auto-Split (original)
 
-<<<<<<< HEAD
-Pass a single CSV — the script splits it 90/5/5 into train/val/test:
-=======
 Pass a single CSV — the script splits it 80/10/10 into train/val/test:
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
 
 ```bash
 python main.py train \
@@ -80,11 +76,7 @@ python main.py train \
 | `--config` | Yes (auto-supplied by `main.py`) | Path to config JSON |
 | `--nbfix` | Yes (auto-supplied by `main.py`) | NBFIX table file |
 | `--data-dir` | Yes | Directory with compound folders |
-<<<<<<< HEAD
-| `--training-csv` | Mode 1 only | Single CSV — auto-split 90/5/5 |
-=======
 | `--training-csv` | Mode 1 only | Single CSV — auto-split 80/10/10 |
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
 | `--train-data` | Modes 2 & 3 | CSV for training set |
 | `--val-data` | Optional (Mode 2) | CSV for validation set |
 | `--test-data` | Optional (Mode 2) | CSV for test set |
