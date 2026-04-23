@@ -9,11 +9,7 @@
       "num_layers": 3,
       "dropout": 0.2,
       "node_dim": 5,
-<<<<<<< HEAD
-      "num_bead_types": 167,
-=======
       "num_bead_types": 168,
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
       "embedding_dim": 32,
       "edge_dim": 3
     }
