@@ -314,11 +314,7 @@ def main():
 
     split_group = parser.add_argument_group("data split options (choose one mode)")
     split_group.add_argument("--training-csv", default=None,
-<<<<<<< HEAD
-                             help="Single CSV with all compounds — auto-split 90/5/5 (original mode)")
-=======
                              help="Single CSV with all compounds — random auto-split 80/10/10")
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
     split_group.add_argument("--train-data", default=None,
                              help="CSV for training set (use alone for train-only, or with --val-data/--test-data)")
     split_group.add_argument("--val-data", default=None,
@@ -359,11 +355,7 @@ def main():
 
     # ── Build graph sets depending on split mode ─────────────────────────────
     if args.training_csv:
-<<<<<<< HEAD
-        # Original auto-split mode: single CSV -> 90/5/5
-=======
         # Auto-split mode: single CSV -> 80/10/10 (random by graph index)
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
         compounds_df = pd.read_csv(args.training_csv)
         compounds_df = compounds_df.dropna(subset=['encapsulation_mean'])
         print(f"\nLoaded {len(compounds_df)} compounds from {args.training_csv}")
@@ -374,11 +366,7 @@ def main():
             return
 
         train_idx, temp_idx = train_test_split(
-<<<<<<< HEAD
-            range(len(graphs)), test_size=0.1, random_state=seed, shuffle=True)
-=======
             range(len(graphs)), test_size=0.2, random_state=seed, shuffle=True)
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
         val_idx, test_idx = train_test_split(
             temp_idx, test_size=0.5, random_state=seed, shuffle=True)
 
@@ -442,20 +430,10 @@ def main():
     val_metrics, val_preds, val_targets, val_compounds, train_losses = train_model(
         model, train_loader, val_loader, device, config)
 
-<<<<<<< HEAD
-    # ── Evaluate on training data in train-only mode ─────────────────────────
-    train_metrics, train_preds, train_targets, train_compounds = (None, None, None, None)
-    if train_only:
-        # shuffle=False so rows match training CSV / graph build order; compound_id aligns
-        eval_loader = DataLoader(train_graphs, batch_size=config['batch_size'], shuffle=False)
-        train_metrics, train_preds, train_targets, train_compounds = validate(
-            model, eval_loader, device)
-=======
     # ── Evaluate on training data (in-sample; shuffle=False preserves graph / compound order)
     eval_train_loader = DataLoader(train_graphs, batch_size=config['batch_size'], shuffle=False)
     train_metrics, train_preds, train_targets, train_compounds = validate(
         model, eval_train_loader, device)
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
 
     # ── Evaluate test set if present ─────────────────────────────────────────
     test_metrics, test_preds, test_targets, test_compounds = (None, None, None, None)
@@ -465,16 +443,9 @@ def main():
 
     # ── Print results ────────────────────────────────────────────────────────
     print("RESULTS")
-<<<<<<< HEAD
-    if train_only:
-        print("\nTraining Set (train-only mode):")
-        print(f"  MAE: {train_metrics['mae']:.4f}, RMSE: {np.sqrt(train_metrics['mse']):.4f}")
-        print(f"  R²: {train_metrics['r2']:.4f}, Spearman: {train_metrics['spearman']:.4f}")
-=======
     print("\nTraining Set:")
     print(f"  MAE: {train_metrics['mae']:.4f}, RMSE: {np.sqrt(train_metrics['mse']):.4f}")
     print(f"  R²: {train_metrics['r2']:.4f}, Spearman: {train_metrics['spearman']:.4f}")
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
     if val_metrics:
         print("\nValidation Set:")
         print(f"  MAE: {val_metrics['mae']:.4f}, RMSE: {np.sqrt(val_metrics['mse']):.4f}")
@@ -496,13 +467,7 @@ def main():
     with open(os.path.join(run_subdir, "config.json"), 'w') as f:
         json.dump({'config': config}, f, indent=2)
 
-<<<<<<< HEAD
-    results_payload = {'config': config}
-    if train_metrics:
-        results_payload['train_metrics'] = train_metrics
-=======
     results_payload = {'config': config, 'train_metrics': train_metrics}
->>>>>>> 67828f9 (Added new data, plotting script, updated train.py)
     if val_metrics:
         results_payload['val_metrics'] = val_metrics
     if test_metrics:
