@@ -1,0 +1,12 @@
+; SC3 single-bead topology
+; Generated from creating_itp.txt
+
+[ moleculetype ]
+; name    nrexcl
+res  1
+
+[ atoms ]
+; nr  type  resnr  residue  atom  cgnr  charge    mass
+  1   SC3      1     res   SC3      1      0.000    54.000
+
+;[bonds]

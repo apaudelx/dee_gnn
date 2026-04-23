@@ -1,0 +1,12 @@
+; TP1d single-bead topology
+; Generated from creating_itp.txt
+
+[ moleculetype ]
+; name    nrexcl
+res  1
+
+[ atoms ]
+; nr  type  resnr  residue  atom  cgnr  charge    mass
+  1   TP1d     1     res   TP1d     1      0.000    36.000
+
+;[bonds]

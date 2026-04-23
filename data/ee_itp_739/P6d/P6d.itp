@@ -1,0 +1,12 @@
+; P6d single-bead topology
+; Generated from creating_itp.txt
+
+[ moleculetype ]
+; name    nrexcl
+res  1
+
+[ atoms ]
+; nr  type  resnr  residue  atom  cgnr  charge    mass
+  1   P6d      1     res   P6d      1      0.000    72.000
+
+;[bonds]
